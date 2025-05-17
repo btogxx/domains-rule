@@ -1,0 +1,123 @@
+#! /bin/sh
+
+complete_wget() {
+	local quiet url fn logf r1 r2
+	quiet=false
+	([ $# -gt 0 ] && [ "$1" = "-q" ]) && {
+		quiet=true
+		shift
+	}
+	case $# in
+	1)
+		url=$1
+		fn=$(echo $url | awk -F/ '{print $NF}')
+		;;
+	2)
+		url=$1
+		fn=$2
+		;;
+	*)
+		return 1
+	esac
+	logf=$(mktemp)
+	LANG=en wget -c -O "$fn" "$url" 2>&1 |
+		($quiet && 
+			tee $logf >/dev/null ||
+			tee $logf)
+
+	grep -Ev "^$" $logf | tail -1 | grep -q "saved"
+	r1=$?
+	grep -Ev "^$" $logf | tail -1 | grep -q "The file is already fully retrieved; nothing to do."
+	r2=$?
+	rm $logf
+	[ $r1 -eq 0 ] && return 0
+	[ $r2 -eq 0 ] && return 0
+	$quiet || {
+		printf "\033[31m"
+		echo complete_wget $url failed
+		printf "\033[0m"
+	}
+	return 2
+}
+
+compare_ff() {
+	[ ! -f $1 ] && return 1
+	[ ! -f $2 ] && return 2
+	local s1=$(sha256sum $1 | awk '{print $1}')
+	local s2=$(sha256sum $2 | awk '{print $1}')
+	[ "$s1" = "$s2" ] && return 0
+	return 3
+}
+
+cd $(dirname $0)
+
+mkdir -p cache
+tmpdir=$(mktemp -d)
+trap "rm -rf $tmpdir" EXIT
+
+update_cnt=0
+
+complete_wget -q \
+	"https://cokebar.github.io/gfwlist2dnsmasq/gfwlist_domain.txt" \
+	$tmpdir/gfwlist_domain.txt ||
+	exit 1
+compare_ff $tmpdir/gfwlist_domain.txt cache/gfwlist_domain.txt ||
+	{
+		update_cnt=$((update_cnt + 1))
+		echo "gfwlist_domain.txt changed"
+		mv $tmpdir/gfwlist_domain.txt cache/gfwlist_domain.txt
+	}
+
+
+complete_wget -q \
+	"https://github.com/felixonmars/dnsmasq-china-list/raw/master/accelerated-domains.china.conf" \
+	$tmpdir/accelerated-domains.china.conf ||
+	exit 1
+compare_ff $tmpdir/accelerated-domains.china.conf cache/accelerated-domains.china.conf ||
+	{
+		update_cnt=$((update_cnt + 1))
+		echo "accelerated-domains.china.conf changed"
+		mv $tmpdir/accelerated-domains.china.conf cache/accelerated-domains.china.conf
+	}
+
+complete_wget -q \
+	"https://github.com/felixonmars/dnsmasq-china-list/raw/master/apple.china.conf" \
+	$tmpdir/apple.china.conf||
+	exit 1
+compare_ff $tmpdir/apple.china.conf cache/apple.china.conf ||
+	{
+		update_cnt=$((update_cnt + 1))
+		echo "apple.china.conf changed"
+		mv $tmpdir/apple.china.conf cache/apple.china.conf
+	}
+
+complete_wget -q \
+	"https://github.com/felixonmars/dnsmasq-china-list/raw/master/google.china.conf" \
+	$tmpdir/google.china.conf||
+	exit 1
+compare_ff $tmpdir/google.china.conf cache/google.china.conf ||
+	{
+		update_cnt=$((update_cnt + 1))
+		echo "google.china.conf changed"
+		mv $tmpdir/google.china.conf cache/google.china.conf
+	}
+
+[ $update_cnt -eq 0 ] && exit 0
+
+
+mkdir -p release/clash/classical
+
+{
+	echo payload:
+	awk -F'/' '/^server=/{printf "- DOMAIN-SUFFIX,%s\n", $2}' \
+		cache/accelerated-domains.china.conf \
+		cache/apple.china.conf \
+		cache/google.china.conf
+} > release/clash/classical/cn.txt
+
+{
+	echo payload:
+	awk '{printf "- DOMAIN-SUFFIX,%s\n", $1}' cache/gfwlist_domain.txt
+} > release/clash/classical/gfw.txt
+
+tar -cavf release.tar.gz -C release .
