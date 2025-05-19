@@ -41,11 +41,11 @@ complete_wget() {
 }
 
 compare_ff() {
-	[ ! -f $1 -o ! -f $2 ] && return 1
-	local s1=$(sha256sum $1 | awk '{print $1}')
-	local s2=$(sha256sum $2 | awk '{print $1}')
-	[ "$s1" = "$s2" ] && return 0
-	return 2
+	[ -f $1 -a -f $2 ] && {
+		[ "$(sha256sum $1 | awk '{print $1}')" = "$(sha256sum $2 | awk '{print $1}')" ] &&
+			return 0
+	}
+	return 1
 }
 
 cd $(dirname $0)
