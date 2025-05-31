@@ -101,6 +101,14 @@ compare_ff $tmpdir/google.china.conf cache/google.china.conf ||
 
 rm -rf $tmpdir
 
+tmpf=$(mktemp)
+md5sum $(find extra -type f) > $tmpf
+compare_ff extra.md5 $tmpf || {
+	update_cnt=$((update_cnt + 1))
+	cp $tmpf extra.md5
+}
+rm -f $tmpf
+
 [ $update_cnt -eq 0 ] && exit 0
 
 mkdir -p release/clash/classical
