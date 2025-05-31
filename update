@@ -111,11 +111,13 @@ mkdir -p release/clash/classical
 		cache/accelerated-domains.china.conf \
 		cache/apple.china.conf \
 		cache/google.china.conf
+	sed 's#.*#- DOMAIN-SUFFIX,\0#' extra/cn/domain.txt
 } > release/clash/classical/cn.txt
 
 {
 	echo payload:
 	awk '{printf "- DOMAIN-SUFFIX,%s\n", $1}' cache/gfwlist_domain.txt
+	sed 's#.*#- DOMAIN-SUFFIX,\0#' extra/gfw/domain.txt
 } > release/clash/classical/gfw.txt
 
 tar -cavf release.tar.gz -C release .
