@@ -1,0 +1,4 @@
+smtp.live.com
+outlook.office365.com
+deepl.com
+ftp.cn.debian.org
