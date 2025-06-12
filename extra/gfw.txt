@@ -1,3 +1,4 @@
 x.com
 zoom.us
 privatebin.at
+duck.ai
