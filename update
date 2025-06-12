@@ -99,9 +99,29 @@ compare_ff $tmpdir/google.china.conf cache/google.china.conf ||
 	}
 }
 
+complete_wget -q \
+	"https://github.com/StevenBlack/hosts/raw/master/hosts" \
+	$tmpdir/blockhosts.txt && {
+compare_ff $tmpdir/blockhosts.txt cache/blockhosts.txt ||
+	{
+		update_cnt=$((update_cnt + 1))
+		echo "blockhosts.txt changed"
+		mv $tmpdir/blockhosts.txt cache/blockhosts.txt
+	}
+}
+
 rm -rf $tmpdir
 
+
 tmpf=$(mktemp)
+[ ! -d extra ] &&
+	mkdir -p extra
+[ ! -f extra/cn.txt ] &&
+	touch extra/cn.txt
+[ ! -f extra/gfw.txt ] &&
+	touch extra/gfw.txt
+[ ! -f extra/block.txt ] &&
+	touch extra/block.txt
 md5sum $(find extra -name '*.txt') > $tmpf
 compare_ff extra/hashes.md5 $tmpf || {
 	update_cnt=$((update_cnt + 1))
@@ -127,5 +147,11 @@ mkdir -p release/clash/classical
 	awk '{printf "- DOMAIN-SUFFIX,%s\n", $1}' cache/gfwlist_domain.txt
 	sed 's#.*#- DOMAIN-SUFFIX,\0#' extra/gfw.txt
 } > release/clash/classical/gfw.txt
+
+{
+	echo payload:
+	awk '/^0.0.0.0/ {printf "- DOMAIN-SUFFIX,%s\n", $2}' cache/blockhosts.txt 
+	sed 's#.*#- DOMAIN-SUFFIX,\0#' extra/block.txt
+} > release/clash/classical/block.txt
 
 tar -cavf release.tar.gz -C release .
