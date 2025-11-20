@@ -48,6 +48,13 @@ compare_ff() {
 	return 1
 }
 
+append_last_newline() {
+	[ -s $1 ] && {
+		tail -c1 $1 | grep -q '^$' ||
+			echo "" >> $1
+	}
+}
+
 cd $(dirname $0)
 
 mkdir -p cache
@@ -127,6 +134,20 @@ compare_ff extra/hashes.md5 $tmpf || {
 	update_cnt=$((update_cnt + 1))
 	cp $tmpf extra/hashes.md5
 }
+
+[ ! -d exclude ] &&
+	mkdir -p exclude
+[ ! -f exclude/cn.txt ] &&
+	touch exclude/cn.txt
+[ ! -f exclude/gfw.txt ] &&
+	touch exclude/gfw.txt
+[ ! -f exclude/block.txt ] &&
+	touch exclude/block.txt
+md5sum $(find exclude -name '*.txt') > $tmpf
+compare_ff exclude/hashes.md5 $tmpf || {
+	update_cnt=$((update_cnt + 1))
+	cp $tmpf exclude/hashes.md5
+}
 rm -f $tmpf
 
 [ $update_cnt -eq 0 ] && exit 0
@@ -153,5 +174,21 @@ mkdir -p release/clash/classical
 	awk '/^0.0.0.0/ {printf "- DOMAIN-SUFFIX,%s\n", $2}' cache/blockhosts.txt 
 	sed 's#.*#- DOMAIN-SUFFIX,\0#' extra/block.txt
 } > release/clash/classical/block.txt
+
+append_last_newline exclude/cn.txt
+while read -r line; do
+	sed -i "/^- DOMAIN-SUFFIX,${line}$/d" release/clash/classical/cn.txt
+done < exclude/cn.txt
+
+append_last_newline exclude/gfw.txt
+while read -r line; do
+	sed -i "/^- DOMAIN-SUFFIX,${line}$/d" release/clash/classical/gfw.txt
+done < exclude/gfw.txt
+
+append_last_newline exclude/block.txt
+while read -r line; do
+	sed -i "/^- DOMAIN-SUFFIX,${line}$/d" release/clash/classical/block.txt
+done < exclude/block.txt
+
 
 tar -cavf release.tar.gz -C release .
